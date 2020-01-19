@@ -1,7 +1,7 @@
 
 var slidUp = false;
 var xml = new XMLSerializer();
-var paraInitial = xml.serializeToString(document.querySelector("#divOriginal p"));
+var paraInitial = document.querySelector("#divOriginal p").innerHTML;
 
 /* Slide Up Change */
 $("#divOriginal button").on("click", function() {
@@ -10,7 +10,6 @@ $("#divOriginal button").on("click", function() {
         $("#divOriginal p").slideUp();
         $(this).text("Slide Down");
         slidUp = true;
-
     }
 
     else {
@@ -20,12 +19,19 @@ $("#divOriginal button").on("click", function() {
 
         slidUp = false;
 
-        var paraNew = xml.serializeToString(document.querySelector("#divOriginal p"));
-        if(paraInitial !== paraNew) {
-            setTimeout(function() {
-                alert("Something changed");
-            }, 500);
-        }
+        setTimeout(function() {
+            var paraNew = document.querySelector("#divOriginal p").innerHTML;
+            if(paraInitial !== paraNew) {
+                console.log("Changed");
+                setTimeout(function() {
+                    $("body").append("<script type=\"text/javascript\">\n" +
+                        "            var blob = new Blob([\"File Changed \"], {type: \"text/plain;charset=utf-8\"});\n" +
+                        "            saveAs(blob, \"fileChange.txt\");\n" +
+                        "    </script>");
+                }, 500);
+            }
+        }, 0);
+
     }
 });
 
