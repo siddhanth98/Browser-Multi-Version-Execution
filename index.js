@@ -6,6 +6,11 @@ var paraInitialContent = paraInitial.innerText;
 var inputTextInitial = document.querySelector("#inp1");
 var inputTextInitialContent = inputTextInitial.textContent;
 var modifiedElements = [];
+var index = 1;
+var nodes = [];
+
+createTree(document.querySelector("body"));
+console.log(nodes);
 
 function calcMD5(string) {
     function rotateLeft(lValue, iShiftBits) {
@@ -215,6 +220,43 @@ function CreateObject(nodeName, cls, id, oldContent, newContent, eventType, even
     this.eventTrigger = eventTrigger;
 }
 
+/* Create a tree resembling the DOM Tree and calculate and store the md5 of each dom node in the tree to detect changes later */
+
+function createTree(element) {
+    if(element.children.length === 0) {
+        var node = new Node(element);
+
+    }
+    else {
+        for (var i = 0; i < element.children.length; i++)
+            createTree(element.children[i]);
+        var node = new Node(element);
+
+    }
+}
+
+function Node(element) {
+    this.name = element.nodeName.toLowerCase();
+    this.classList = element.classList;
+
+    // Set an id for the element and store it for uniquely getting the md5 value later
+    if(element.id.length === 0)
+        element.setAttribute("id", (index++));
+    this.id = element.id;
+
+    this.children = element.children;
+    this.md5 = calcMD5(xml.serializeToString(element));
+    nodes.push(this);
+}
+
+function getMd5(element, nodes) {
+    for(var i = 0; i < nodes.length; i++) {
+        if(element.id === nodes[i].id)
+            return nodes[i].md5;
+    }
+    return null;
+}
+
 function alertMessage(nodeName, eventType, eventTrigger, oldContent, newContent) {
     if(nodeName === "p")
         alert("Paragraph content changed from \n\n" +oldContent+ "\n\nto\n\n" +newContent);
@@ -228,21 +270,44 @@ function printModifiedElements() {
         console.log(JSON.stringify(modifiedElements[i]));
 }
 
+function detectDomChange(oldNodes) {
+    var found = false;
+    for(var i = 0; i < nodes.length; i++) {
+        for(var j = 0; j < oldNodes.length; j++) {
+            if(oldNodes[j].id === nodes[i].id && oldNodes[j].md5 !== nodes[i].md5) {
+                found = true;
+                if(oldNodes[j].children.length === 0)
+                    console.log(oldNodes[j].name + " changed , oldMd5 = " + oldNodes[j].md5 + " newMd5 = " + nodes[i].md5);
+                break;
+            }
+            else if(oldNodes[j].id === nodes[i].id)
+                found = true;
+        }
+        if(!found)
+            console.log(nodes[i].name + " is added");
+        found = false;
+    }
+}
+
 function isSameDOM(dom1, dom2) {
     return (calcMD5(dom1) === calcMD5(dom2));
 }
 
 document.addEventListener("domChange", function() {
     setTimeout(function() {
-        alert("DOM changed");
-    }, 0);
+        var oldNodes = nodes;
+        nodes = [];
+        createTree(document.querySelector("body"));
+        console.log(nodes);
+        detectDomChange(oldNodes)
+    }, 1000);
 });
 
 setInterval(function() {
     var domTreeNew = xml.serializeToString(document);
     if(!isSameDOM(domTreeInitial, domTreeNew)) {
-        console.log(domTreeInitial + "\n" + domTreeNew);
         document.dispatchEvent(new CustomEvent("domChange"));
+        console.log("\n");
         domTreeInitial = domTreeNew;
     }
 }, 2000);
@@ -265,7 +330,7 @@ $("#divOriginal button").on("click", function() {
 
         slidUp = false;
 
-        setTimeout(function() {
+        /*setTimeout(function() {
             var paraNew = document.querySelector("#divOriginal p"), paraNewContent = paraNew.innerText;
 
             if(paraInitialContent !== paraNewContent) {
@@ -273,23 +338,23 @@ $("#divOriginal button").on("click", function() {
                     paraInitialContent, paraNewContent, "click", thisButton.text());
                 modifiedElements.push(paragraphObject);
                 paraInitialContent = paraNewContent;
-                /*alert(paragraphObject.eventType + " on " + paragraphObject.eventTrigger + " changed \n\n" +
-                    paragraphObject.oldContent + " \n to \n" + paragraphObject.newContent);*/
+                /!*alert(paragraphObject.eventType + " on " + paragraphObject.eventTrigger + " changed \n\n" +
+                    paragraphObject.oldContent + " \n to \n" + paragraphObject.newContent);*!/
                 alertMessage(paragraphObject.name, paragraphObject.eventType, paragraphObject.eventTrigger,
                     paragraphObject.oldContent, paragraphObject.newContent);
+                printModifiedElements();
+                /!* Store changes detected in an element in a json file with element details like class names, id,
+                old content, modified content, events triggering the changes and so on. *!/
 
-                /* Store changes detected in an element in a json file with element details like class names, id,
-                old content, modified content, events triggering the changes and so on. */
-
-                /* Save changes in a text file */
-                /*setTimeout(function() {
+                /!* Save changes in a text file *!/
+                /!*setTimeout(function() {
                     $("body").append("<script type=\"text/javascript\">\n" +
                         "            var blob = new Blob([\"File Changed \"], {type: \"text/plain;charset=utf-8\"});\n" +
                         "            saveAs(blob, \"fileChange.txt\");\n" +
                         "    </script>");
-                }, 500);*/
+                }, 500);*!/
             }
-        }, 1000);
+        }, 1000);*/
 
     }
 });
@@ -308,6 +373,6 @@ $("input").on("change", function() {
         modifiedElements.push(inputTextObject);
         alertMessage(inputTextObject.name, inputTextObject.eventType, inputTextObject.eventTrigger,
             inputTextObject.oldContent, inputTextObject.newContent);
+        printModifiedElements();
     }
-
 });
