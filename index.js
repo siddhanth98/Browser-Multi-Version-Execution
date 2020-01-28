@@ -223,10 +223,9 @@ function CreateObject(nodeName, cls, id, oldContent, newContent, eventType, even
 /* Create a tree resembling the DOM Tree and calculate and store the md5 of each dom node in the tree to detect changes later */
 
 function createTree(element) {
-    if(element.children.length === 0) {
+    if(element.children.length === 0)
         var node = new Node(element);
 
-    }
     else {
         for (var i = 0; i < element.children.length; i++)
             createTree(element.children[i]);
@@ -270,14 +269,24 @@ function printModifiedElements() {
         console.log(JSON.stringify(modifiedElements[i]));
 }
 
-function detectDomChange(oldNodes) {
+function detectDomChange(oldNodes, eventTrigger, eventType) {
     var found = false;
+
+    if(eventType === "click")
+        console.log("Click on button with text " +eventTrigger.text());
+
+    else if(eventType === "change")
+        console.log("Text Box Change");
+
     for(var i = 0; i < nodes.length; i++) {
         for(var j = 0; j < oldNodes.length; j++) {
             if(oldNodes[j].id === nodes[i].id && oldNodes[j].md5 !== nodes[i].md5) {
+
                 found = true;
-                if(oldNodes[j].children.length === 0)
+                if(oldNodes[j].children.length === 0) {
+                    // Save change details
                     console.log(oldNodes[j].name + " changed , oldMd5 = " + oldNodes[j].md5 + " newMd5 = " + nodes[i].md5);
+                }
                 break;
             }
             else if(oldNodes[j].id === nodes[i].id)
@@ -293,6 +302,7 @@ function isSameDOM(dom1, dom2) {
     return (calcMD5(dom1) === calcMD5(dom2));
 }
 
+/*
 document.addEventListener("domChange", function() {
     setTimeout(function() {
         var oldNodes = nodes;
@@ -302,15 +312,36 @@ document.addEventListener("domChange", function() {
         detectDomChange(oldNodes)
     }, 1000);
 });
+*/
 
+/*
 setInterval(function() {
     var domTreeNew = xml.serializeToString(document);
     if(!isSameDOM(domTreeInitial, domTreeNew)) {
-        document.dispatchEvent(new CustomEvent("domChange"));
-        console.log("\n");
+        var oldNodes = nodes;
+        nodes = [];
+        createTree(document.querySelector("body"));
+        console.log(nodes);
+        detectDomChange(oldNodes, null, "");
         domTreeInitial = domTreeNew;
     }
 }, 2000);
+*/
+
+
+$("#divOriginal button").on("click", function() {
+    setInterval(function() {
+        var changedDom = xml.serializeToString(document);
+        if(!isSameDOM(domTreeInitial, changedDom)) {
+            var oldNodes = nodes;
+            nodes = [];
+            createTree(document.querySelector("body"));
+            console.log(nodes);
+            detectDomChange(oldNodes, $("#divOriginal button"), "click");
+            domTreeInitial = changedDom;
+        }
+    }, 2000);
+});
 
 /* Button Click Event */
 $("#divOriginal button").on("click", function() {
@@ -361,7 +392,20 @@ $("#divOriginal button").on("click", function() {
 
 /* Input Text Box Event */
 $("input").on("change", function() {
-    var inputTextNew = $(this), inputTextNewContent = inputTextNew.val();
+
+    setInterval(function() {
+        var changedDom = xml.serializeToString(document);
+        if(!isSameDOM(domTreeInitial, changedDom)) {
+            var oldNodes = nodes;
+            nodes = [];
+            createTree(document.querySelector("body"));
+            console.log(nodes);
+            detectDomChange(oldNodes, $("input"), "change");
+            domTreeInitial = changedDom;
+        }
+    }, 2000);
+
+    /*var inputTextNew = $(this), inputTextNewContent = inputTextNew.val();
     var domTreeNew = xml.serializeToString(document);
 
     if(inputTextInitialContent !== inputTextNewContent) {
@@ -374,5 +418,5 @@ $("input").on("change", function() {
         alertMessage(inputTextObject.name, inputTextObject.eventType, inputTextObject.eventTrigger,
             inputTextObject.oldContent, inputTextObject.newContent);
         printModifiedElements();
-    }
+    }*/
 });
