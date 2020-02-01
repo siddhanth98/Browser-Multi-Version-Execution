@@ -10,7 +10,6 @@ var index = 1;
 var nodes = [];
 
 createTree(document.querySelector("body"));
-console.log(nodes);
 
 function calcMD5(string) {
     function rotateLeft(lValue, iShiftBits) {
@@ -221,7 +220,6 @@ function CreateObject(nodeName, cls, id, oldContent, newContent, eventType, even
 }
 
 /* Create a tree resembling the DOM Tree and calculate and store the md5 of each dom node in the tree to detect changes later */
-
 function createTree(element) {
     if(element.children.length === 0)
         var node = new Node(element);
@@ -242,7 +240,7 @@ function Node(element) {
     if(element.id.length === 0)
         element.setAttribute("id", (index++));
     this.id = element.id;
-
+    this.html = element.innerHTML;
     this.children = element.children;
     this.md5 = calcMD5(xml.serializeToString(element));
     nodes.push(this);
@@ -272,19 +270,35 @@ function printModifiedElements() {
 function detectDomChange(oldNodes, eventTrigger, eventType) {
     var found = false;
 
-    if(eventType === "click")
-        console.log("Click on button with text " +eventTrigger.text());
-
-    else if(eventType === "change")
-        console.log("Text Box Change");
-
     for(var i = 0; i < nodes.length; i++) {
         for(var j = 0; j < oldNodes.length; j++) {
-            if(oldNodes[j].id === nodes[i].id && oldNodes[j].md5 !== nodes[i].md5) {
 
+            if(oldNodes[j].id === nodes[i].id && oldNodes[j].md5 !== nodes[i].md5) {
                 found = true;
+
+                if(eventTrigger.attr("id").length === 0) {
+                    eventTrigger.attr("id", (index++));
+
+                }
                 if(oldNodes[j].children.length === 0) {
                     // Save change details
+                    if(eventType === "click") {
+                        // Save click details in a JS object
+
+                        var modifiedElement = new CreateObject(oldNodes[j].name, oldNodes[j].classList, oldNodes[j].id,
+                            oldNodes[j].html, nodes[i].html, eventType, eventTrigger.attr("id"));
+                        modifiedElements.push(modifiedElement);
+                        printModifiedElements();
+                        console.log("Click on button with text " + eventTrigger.text());
+                    }
+
+                    else if(eventType === "change") {
+                        // Save change details in a JS object
+                        var modifiedElement = new CreateObject(oldNodes[j].name, oldNodes[j].classList, oldNodes[j].id,
+                            oldNodes[j].html, nodes[i].html, eventType, eventTrigger.attr("id"));
+                        printModifiedElements();
+                        console.log("Text Box Change");
+                    }
                     console.log(oldNodes[j].name + " changed , oldMd5 = " + oldNodes[j].md5 + " newMd5 = " + nodes[i].md5);
                 }
                 break;
@@ -292,8 +306,15 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
             else if(oldNodes[j].id === nodes[i].id)
                 found = true;
         }
-        if(!found)
+        if(!found) {
+            if(eventTrigger.attr("id").length === 0)
+                eventTrigger.attr("id", (index++));
+
+            // Save details of new element added in the JS object
+            var modifiedElement = new CreateObject(nodes[i].name, nodes[i].classList, nodes[i].id, null,
+                nodes[i].html, eventType, eventTrigger.attr("id"));
             console.log(nodes[i].name + " is added");
+        }
         found = false;
     }
 }
@@ -312,9 +333,7 @@ document.addEventListener("domChange", function() {
         detectDomChange(oldNodes)
     }, 1000);
 });
-*/
 
-/*
 setInterval(function() {
     var domTreeNew = xml.serializeToString(document);
     if(!isSameDOM(domTreeInitial, domTreeNew)) {
@@ -327,7 +346,6 @@ setInterval(function() {
     }
 }, 2000);
 */
-
 
 $("#divOriginal button").on("click", function() {
     setInterval(function() {
