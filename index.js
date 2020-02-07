@@ -8,6 +8,7 @@ var inputTextInitialContent = inputTextInitial.textContent;
 var modifiedElements = [];
 var index = 1;
 var nodes = [];
+var textAreaExists = false;
 
 createTree(document.querySelector("body"));
 
@@ -216,7 +217,8 @@ function CreateObject(nodeName, cls, id, oldContent, newContent, eventType, even
     this.oldContent = oldContent;
     this.newContent = newContent;
     this.eventType = eventType;
-    this.eventTrigger = eventTrigger;
+    this.eventTriggerID = eventTrigger;
+
 }
 
 /* Create a tree resembling the DOM Tree and calculate and store the md5 of each dom node in the tree to detect changes later */
@@ -267,6 +269,22 @@ function printModifiedElements() {
         console.log(JSON.stringify(modifiedElements[i]));
 }
 
+function dumpChangesInTextArea(modifiedElement) {
+    if(modifiedElement.id !== "new") {
+        console.log(modifiedElement.eventTriggerID);
+        if (!textAreaExists) {
+            // TextArea is created for the 1st time.
+            $("body").append("<textarea id = \"new\" rows = \"5\" cols = \"50\"></textarea>");
+            $("#new").val(JSON.stringify(modifiedElement));
+            textAreaExists = true;
+        } else {
+            // TextArea exists. Append modified element details to it.
+            let textArea = $("#new"), textAreaContent = textArea.val();
+            textArea.val(textAreaContent + "\n\n\n" + JSON.stringify(modifiedElement));
+        }
+    }
+}
+
 function detectDomChange(oldNodes, eventTrigger, eventType) {
     var found = false;
 
@@ -278,32 +296,32 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
 
                 if(eventTrigger.attr("id").length === 0) {
                     eventTrigger.attr("id", (index++));
-
                 }
+                
                 if(oldNodes[j].children.length === 0) {
-                    // Save change details
+                    // Leaf Children reached. Save change details
                     if(eventType === "click") {
-                        // Save click details in a JS object
+                        // Save click details (button) in a JS object
 
                         var modifiedElement = new CreateObject(oldNodes[j].name, oldNodes[j].classList, oldNodes[j].id,
                             oldNodes[j].html, nodes[i].html, eventType, eventTrigger.attr("id"));
                         modifiedElements.push(modifiedElement);
-                        printModifiedElements();
-                        console.log("Click on button with text " + eventTrigger.text());
                     }
 
                     else if(eventType === "change") {
-                        // Save change details in a JS object
+                        // Save change details (input text box) in a JS object
                         var modifiedElement = new CreateObject(oldNodes[j].name, oldNodes[j].classList, oldNodes[j].id,
                             oldNodes[j].html, nodes[i].html, eventType, eventTrigger.attr("id"));
-                        printModifiedElements();
                         console.log("Text Box Change");
                     }
-                    console.log(oldNodes[j].name + " changed , oldMd5 = " + oldNodes[j].md5 + " newMd5 = " + nodes[i].md5);
+                    // Now save the details in the json file (TextArea)
+
+                    dumpChangesInTextArea(modifiedElement);
                 }
                 break;
             }
             else if(oldNodes[j].id === nodes[i].id)
+                // Node has been found but the md5 value did not change
                 found = true;
         }
         if(!found) {
@@ -313,7 +331,7 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
             // Save details of new element added in the JS object
             var modifiedElement = new CreateObject(nodes[i].name, nodes[i].classList, nodes[i].id, null,
                 nodes[i].html, eventType, eventTrigger.attr("id"));
-            console.log(nodes[i].name + " is added");
+            dumpChangesInTextArea(modifiedElement);
         }
         found = false;
     }
@@ -376,7 +394,7 @@ $("#divOriginal button").on("click", function() {
         /* Expected Change */
         $("#divOriginal p").slideDown();
         $(this).text("Slide Up");
-
+        $("#divOriginal p").text($("#divOriginal p").text().toString().toUpperCase());
         slidUp = false;
 
         /*setTimeout(function() {
