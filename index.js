@@ -271,7 +271,6 @@ function printModifiedElements() {
 
 function dumpChangesInTextArea(modifiedElement) {
     if(modifiedElement.id !== "new") {
-        console.log(modifiedElement.eventTriggerID);
         if (!textAreaExists) {
             // TextArea is created for the 1st time.
             $("body").append("<textarea id = \"new\" rows = \"5\" cols = \"50\"></textarea>");
@@ -282,6 +281,13 @@ function dumpChangesInTextArea(modifiedElement) {
             let textArea = $("#new"), textAreaContent = textArea.val();
             textArea.val(textAreaContent + "\n\n\n" + JSON.stringify(modifiedElement));
         }
+    }
+}
+
+function dumpChangesInLocalStorage(modifiedElements) {
+    localStorage.clear();
+    for (let i = 0; i < modifiedElements.length; i++) {
+        localStorage.setItem(modifiedElements[i].name, JSON.stringify(modifiedElements[i]));
     }
 }
 
@@ -297,7 +303,7 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
                 if(eventTrigger.attr("id").length === 0) {
                     eventTrigger.attr("id", (index++));
                 }
-                
+
                 if(oldNodes[j].children.length === 0) {
                     // Leaf Children reached. Save change details
                     if(eventType === "click") {
@@ -312,11 +318,11 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
                         // Save change details (input text box) in a JS object
                         var modifiedElement = new CreateObject(oldNodes[j].name, oldNodes[j].classList, oldNodes[j].id,
                             oldNodes[j].html, nodes[i].html, eventType, eventTrigger.attr("id"));
-                        console.log("Text Box Change");
+                        modifiedElements.push(modifiedElement);
                     }
-                    // Now save the details in the json file (TextArea)
 
-                    dumpChangesInTextArea(modifiedElement);
+                    // Now save the details in the json file (TextArea)
+                    dumpChangesInLocalStorage(modifiedElements);
                 }
                 break;
             }
@@ -324,14 +330,17 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
                 // Node has been found but the md5 value did not change
                 found = true;
         }
+
         if(!found) {
             if(eventTrigger.attr("id").length === 0)
                 eventTrigger.attr("id", (index++));
 
             // Save details of new element added in the JS object
+            console.log(eventType);
             var modifiedElement = new CreateObject(nodes[i].name, nodes[i].classList, nodes[i].id, null,
                 nodes[i].html, eventType, eventTrigger.attr("id"));
-            dumpChangesInTextArea(modifiedElement);
+            modifiedElements.push(modifiedElement);
+            dumpChangesInLocalStorage(modifiedElements);
         }
         found = false;
     }
@@ -341,38 +350,13 @@ function isSameDOM(dom1, dom2) {
     return (calcMD5(dom1) === calcMD5(dom2));
 }
 
-/*
-document.addEventListener("domChange", function() {
-    setTimeout(function() {
-        var oldNodes = nodes;
-        nodes = [];
-        createTree(document.querySelector("body"));
-        console.log(nodes);
-        detectDomChange(oldNodes)
-    }, 1000);
-});
-
-setInterval(function() {
-    var domTreeNew = xml.serializeToString(document);
-    if(!isSameDOM(domTreeInitial, domTreeNew)) {
-        var oldNodes = nodes;
-        nodes = [];
-        createTree(document.querySelector("body"));
-        console.log(nodes);
-        detectDomChange(oldNodes, null, "");
-        domTreeInitial = domTreeNew;
-    }
-}, 2000);
-*/
-
 $("#divOriginal button").on("click", function() {
-    setInterval(function() {
+    setTimeout(function() {
         var changedDom = xml.serializeToString(document);
         if(!isSameDOM(domTreeInitial, changedDom)) {
             var oldNodes = nodes;
             nodes = [];
             createTree(document.querySelector("body"));
-            console.log(nodes);
             detectDomChange(oldNodes, $("#divOriginal button"), "click");
             domTreeInitial = changedDom;
         }
@@ -396,63 +380,19 @@ $("#divOriginal button").on("click", function() {
         $(this).text("Slide Up");
         $("#divOriginal p").text($("#divOriginal p").text().toString().toUpperCase());
         slidUp = false;
-
-        /*setTimeout(function() {
-            var paraNew = document.querySelector("#divOriginal p"), paraNewContent = paraNew.innerText;
-
-            if(paraInitialContent !== paraNewContent) {
-                var paragraphObject = new CreateObject(paraNew.nodeName, paraNew.classList, paraNew.id,
-                    paraInitialContent, paraNewContent, "click", thisButton.text());
-                modifiedElements.push(paragraphObject);
-                paraInitialContent = paraNewContent;
-                /!*alert(paragraphObject.eventType + " on " + paragraphObject.eventTrigger + " changed \n\n" +
-                    paragraphObject.oldContent + " \n to \n" + paragraphObject.newContent);*!/
-                alertMessage(paragraphObject.name, paragraphObject.eventType, paragraphObject.eventTrigger,
-                    paragraphObject.oldContent, paragraphObject.newContent);
-                printModifiedElements();
-                /!* Store changes detected in an element in a json file with element details like class names, id,
-                old content, modified content, events triggering the changes and so on. *!/
-
-                /!* Save changes in a text file *!/
-                /!*setTimeout(function() {
-                    $("body").append("<script type=\"text/javascript\">\n" +
-                        "            var blob = new Blob([\"File Changed \"], {type: \"text/plain;charset=utf-8\"});\n" +
-                        "            saveAs(blob, \"fileChange.txt\");\n" +
-                        "    </script>");
-                }, 500);*!/
-            }
-        }, 1000);*/
-
     }
 });
 
 /* Input Text Box Event */
 $("input").on("change", function() {
-
-    setInterval(function() {
+    setTimeout(function() {
         var changedDom = xml.serializeToString(document);
         if(!isSameDOM(domTreeInitial, changedDom)) {
             var oldNodes = nodes;
             nodes = [];
             createTree(document.querySelector("body"));
-            console.log(nodes);
             detectDomChange(oldNodes, $("input"), "change");
             domTreeInitial = changedDom;
         }
     }, 2000);
-
-    /*var inputTextNew = $(this), inputTextNewContent = inputTextNew.val();
-    var domTreeNew = xml.serializeToString(document);
-
-    if(inputTextInitialContent !== inputTextNewContent) {
-        var inputTextObject = new CreateObject(inputTextNew.prop("tagName"), inputTextNew.classList,
-            inputTextNew.id, inputTextInitialContent, inputTextNewContent, "change",
-            inputTextNew.prop("tagName"));
-
-        inputTextInitialContent = inputTextNewContent;
-        modifiedElements.push(inputTextObject);
-        alertMessage(inputTextObject.name, inputTextObject.eventType, inputTextObject.eventTrigger,
-            inputTextObject.oldContent, inputTextObject.newContent);
-        printModifiedElements();
-    }*/
 });
