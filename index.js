@@ -10,6 +10,7 @@ var index = 1;
 var nodes = [];
 var textAreaExists = false;
 
+$("body").append("<button id = 'triggerButton'> Trigger </button>");
 createTree(document.querySelector("body"));
 
 function calcMD5(string) {
@@ -218,7 +219,6 @@ function CreateObject(nodeName, cls, id, oldContent, newContent, eventType, even
     this.newContent = newContent;
     this.eventType = eventType;
     this.eventTriggerID = eventTrigger;
-
 }
 
 /* Create a tree resembling the DOM Tree and calculate and store the md5 of each dom node in the tree to detect changes later */
@@ -350,6 +350,44 @@ function isSameDOM(dom1, dom2) {
     return (calcMD5(dom1) === calcMD5(dom2));
 }
 
+// Trigger Required Change
+$("#triggerButton").on("click", function() {
+    var oldTextAreaCreated = false, newTextAreaCreated = false;
+    let userElementToTrigger = prompt("Which element to watch?");
+    keys = Object.keys(localStorage);
+   for(let i = 0; i < keys.length; i += 1) {
+       if(keys[i] === userElementToTrigger) {
+           let changedElement = JSON.parse(localStorage.getItem(keys[i]));
+
+           // Insert a textarea and post old and new contents of the target element from localStorage
+           if(!oldTextAreaCreated) {
+               $("body").append("<textarea id = \"oldTargetTextArea\"></textarea>");
+               oldTextAreaCreated = true;
+           }
+           $("#oldTargetTextArea").val(changedElement.oldContent + "\n\n" + changedElement.newContent);
+
+           let eventToTrigger = changedElement.eventType;
+           let elementToTrigger = $("#" + changedElement.eventTriggerID);
+
+           // Insert another textarea and post old and new contents of same target element in new page
+           if(!newTextAreaCreated) {
+               $("body").append("<textarea id = \"newTargetTextArea\"></textarea>");
+               newTextAreaCreated = true;
+           }
+
+           $("#newTargetTextArea").val($("#" + changedElement.id).html() + "\n\n");
+           elementToTrigger.trigger(eventToTrigger);
+           $("#newTargetTextArea").val($("#newTargetTextArea").val() + $("#" + changedElement.id).html() + "\n\n");
+
+           // Compare md5 values of target element on old page and target element on new page
+           let md5Old = calcMD5($("#oldTargetTextArea").val().trim());
+           let md5New = calcMD5($("#newTargetTextArea").val().trim());
+           console.log(md5Old === md5New);
+           break;
+       }
+   }
+});
+
 $("#divOriginal button").on("click", function() {
     setTimeout(function() {
         var changedDom = xml.serializeToString(document);
@@ -370,6 +408,7 @@ $("#divOriginal button").on("click", function() {
     if(!slidUp) {
         /* Expected Change */
         $("#divOriginal p").slideUp();
+        $("#divOriginal p").text($("#divOriginal p").text().toString().toUpperCase());
         $(this).text("Slide Down");
         slidUp = true;
     }
@@ -378,7 +417,6 @@ $("#divOriginal button").on("click", function() {
         /* Expected Change */
         $("#divOriginal p").slideDown();
         $(this).text("Slide Up");
-        $("#divOriginal p").text($("#divOriginal p").text().toString().toUpperCase());
         slidUp = false;
     }
 });
