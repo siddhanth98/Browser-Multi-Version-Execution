@@ -8,7 +8,25 @@ var nodes = [];
 
 $("body").append("<button id = 'triggerButton'> Trigger </button>");
 $("body").append("<input type = \"file\" id = \"file-input\">");
-createTree(document.querySelector("html"));
+assignID(document.querySelector("html"));
+
+setTimeout(function() {
+    createTree(document.querySelector("html"));
+}, 0);
+
+function assignID(element) {
+    if(element.children.length === 0 && (element.getAttribute("id") === null ||
+        element.getAttribute("id").length === 0))
+        element.setAttribute("id", index++);
+
+    else {
+        if(element.getAttribute("id") === null || element.getAttribute("id").length === 0)
+            element.setAttribute("id", index++);
+
+        for(let i = 0 ; i < element.children.length; i++)
+            assignID(element.children[i]);
+    }
+}
 
 function calcMD5(string) {
     function rotateLeft(lValue, iShiftBits) {
@@ -223,15 +241,15 @@ function Node(element) {
     this.classList = element.classList;
 
     // Set an id for the element and store it for uniquely getting the md5 value later
-    if(element.id === undefined || element.id.length === 0)
-        element.setAttribute("id", (index++));
+    /*if(element.id === undefined || element.id.length === 0)
+        element.setAttribute("id", (index++));*/
     this.id = element.id;
     this.children = element.children;
-    this.md5 = calcMD5(xml.serializeToString(element));
-    console.log(this.name + " -> " + this.md5);
     if(element.nodeName.toLowerCase() === "input" || element.nodeName.toLowerCase() === "textarea")
         this.value = element.value;
+    this.md5 = calcMD5(xml.serializeToString(element));
     nodes.push(this);
+
 }
 
 /* Create a tree resembling the DOM Tree, calculate and store the md5 of each dom node in the tree to detect changes later */
@@ -240,9 +258,9 @@ function createTree(element) {
         new Node(element);
 
     else {
-        new Node(element);
         for (let i = 0; i < element.children.length; i++)
             createTree(element.children[i]);
+        new Node(element);
     }
 }
 
@@ -282,6 +300,7 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
                 }
 
                 else if(eventType === "change") {
+
                     modifiedElement = new CreateObject(oldNodes[j].name, oldNodes[j].classList, oldNodes[j].id,
                         eventType, eventTrigger.attr("id"), oldNodes[j].md5, nodes[i].md5);
                     modifiedElement["oldVal"] = oldNodes[j].value;
@@ -289,9 +308,6 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
                     modifiedElements.push(modifiedElement);
                 }
 
-                // Now save the details in the json file (TextArea)
-                dumpChangesInLocalStorage(modifiedElements);
-                dumpChangesToDisk(modifiedElements);
                 break;
             }
             else if(oldNodes[j].id === nodes[i].id)
@@ -304,8 +320,6 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
             modifiedElement = new CreateObject(nodes[i].name, nodes[i].classList, nodes[i].id,
                 eventType, eventTrigger.attr("id"), nodes[i].md5, nodes[i].md5);
             modifiedElements.push(modifiedElement);
-            dumpChangesInLocalStorage(modifiedElements);
-            dumpChangesToDisk(modifiedElements);
         }
         found = false;
     }
@@ -330,12 +344,10 @@ document.querySelector("#file-input").addEventListener("change", function(e) {
             let oldJson = indexedModifiedElements[keys[i]];
 
             if (oldJson["name"] === elementToWatch && oldJson["eventTriggerID"] === elementToTrigger) {
-                console.log(oldJson);
                 let currentTargetElementMD5 = calcMD5(xml.serializeToString(document.getElementById(oldJson["id"])));
-                if(currentTargetElementMD5 === oldJson["oldMd5"]) {
+                if(currentTargetElementMD5 === oldJson["oldMd5"]) { // Current page state is the same as it was when
+                                                                    // change was stored
                     elementFound = true;
-
-                    console.log(oldJson);
                     let eventToTrigger = oldJson["eventType"];
                     let elementToTrigger = document.getElementById(oldJson["eventTriggerID"]);
 
@@ -344,8 +356,18 @@ document.querySelector("#file-input").addEventListener("change", function(e) {
 
                     setTimeout(function () {
                         let oldCurrentMD5 = calcMD5(xml.serializeToString(document.getElementById(oldJson["id"])));
+
+                        // Handle Case for Triggering Radio Button Change
+                        if(eventToTrigger === "change" && elementToTrigger.getAttribute("type") === "radio") {
+                            $("#" + oldJson["eventTriggerID"]).attr("checked", true);
+                        }
+
                         $(elementToTrigger).trigger(eventToTrigger); // Change triggered
                         let newCurrentMD5 = calcMD5(xml.serializeToString(document.getElementById(oldJson["id"])));
+
+                        // if(eventToTrigger === "change" && elementToTrigger.getAttribute("type") === "radio") {
+                        //     $("#" + oldJson["eventTriggerID"]).attr("checked", false);
+                        // }
 
                         if (oldPrevMD5 !== oldCurrentMD5)
                             console.log("MD5 before change is not the same - " + oldPrevMD5 + " -> " + oldCurrentMD5);
@@ -354,13 +376,15 @@ document.querySelector("#file-input").addEventListener("change", function(e) {
                         if (newPrevMD5 !== newCurrentMD5)
                             console.log("MD5 after change is not the same - " + newPrevMD5 + " -> " + newCurrentMD5);
                         else console.log("MD5 after change is the same - " + newCurrentMD5);
-                    }, 200);
+                    }, 0);
                 }
             }
         }
 
-        if(!elementFound)
+        if(!elementFound) {
             alert("Target element not found on the page");
+
+        }
     };
     reader.readAsText(file);
 });
@@ -379,6 +403,7 @@ $("button").on("click", function() {
             createTree(document.querySelector("html"));
 
             detectDomChange(oldNodes, buttonClicked, "click");
+            dumpChangesToDisk(modifiedElements);
             domTreeInitial = currentDOM;
         }
     }, 2000);
@@ -394,8 +419,20 @@ $("input").on("change", function() {
         if(calcMD5(domTreeInitial) !== calcMD5(currentDOM)) {
             let oldNodes = nodes;
             nodes = [];
+
+            // If input is a radio button then change "checked" to true, store change and change "checked" back to false
+            // to preserve md5 value of the body
+
+            if(inputElement.attr("type") === "radio")
+                inputElement.attr("checked", true);
+
             createTree(document.querySelector("html"));
+
+            /*if(inputElement.attr("type") === "radio")
+                inputElement.attr("checked", false);*/
+
             detectDomChange(oldNodes, inputElement, "change");
+            dumpChangesToDisk(modifiedElements);
             domTreeInitial = currentDOM;
         }
     }, 1000);
