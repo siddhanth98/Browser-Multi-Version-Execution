@@ -300,7 +300,6 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
                 }
 
                 else if(eventType === "change") {
-
                     modifiedElement = new CreateObject(oldNodes[j].name, oldNodes[j].classList, oldNodes[j].id,
                         eventType, eventTrigger.attr("id"), oldNodes[j].md5, nodes[i].md5);
                     modifiedElement["oldVal"] = oldNodes[j].value;
@@ -325,7 +324,7 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
     }
 }
 
-document.querySelector("#file-input").addEventListener("change", function(e) {
+document.querySelector("#file-input").addEventListener("input", function(e) {
     let file = e.target.files[0];
 
     if(!file)
@@ -358,7 +357,8 @@ document.querySelector("#file-input").addEventListener("change", function(e) {
                         let oldCurrentMD5 = calcMD5(xml.serializeToString(document.getElementById(oldJson["id"])));
 
                         // Handle Case for Triggering Radio Button Change
-                        if(eventToTrigger === "change" && elementToTrigger.getAttribute("type") === "radio") {
+                        if(eventToTrigger === "change" && (elementToTrigger.getAttribute("type") === "radio"
+                            || elementToTrigger.getAttribute("type") === "checkbox")) {
                             $("#" + oldJson["eventTriggerID"]).attr("checked", true);
                         }
 
@@ -420,10 +420,10 @@ $("input").on("change", function() {
             let oldNodes = nodes;
             nodes = [];
 
-            // If input is a radio button then change "checked" to true, store change and change "checked" back to false
+            // If input is a radio button then change "checked" to true, store change
             // to preserve md5 value of the body
 
-            if(inputElement.attr("type") === "radio")
+            if(inputElement.attr("type") === "radio" || inputElement.attr("type") === "checkbox")
                 inputElement.attr("checked", true);
 
             createTree(document.querySelector("html"));
@@ -485,4 +485,12 @@ $("input[type = 'radio']").on("change", function() {
         $("body").removeClass("bgRed");
         $("body").addClass("bgGreen");
     }
+});
+
+$("input[type = 'checkbox']").on("change", function() {
+    let checkVal = $("input[type = 'checkbox']:checked").map(function() {
+        return $(this).val();
+    }).get();
+
+    $("#newHeader").html(checkVal.join());
 });
