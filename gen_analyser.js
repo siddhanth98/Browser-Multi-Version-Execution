@@ -324,7 +324,8 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
     }
 }
 
-document.querySelector("#file-input").addEventListener("input", function(e) {
+document.querySelector("#file-input").addEventListener("change", function(e) {
+    // Replays the events associated to a specific element in sequence
     let file = e.target.files[0];
 
     if(!file)
@@ -334,56 +335,40 @@ document.querySelector("#file-input").addEventListener("input", function(e) {
     reader.onload = function(e) {
         let contents = e.target.result.toString();
         let indexedModifiedElements = JSON.parse(contents);
-        let elementToWatch = prompt("Which element to watch?");
-        let elementToTrigger = prompt("Which element to trigger?");
         let keys = Object.keys(indexedModifiedElements);
-        let elementFound = false;
+        let elementToWatch = prompt("Which element to watch?");
 
-        for(let i = 0; i < keys.length; i++) {
+        for (let i = 0; i < keys.length; i++) {
             let oldJson = indexedModifiedElements[keys[i]];
 
-            if (oldJson["name"] === elementToWatch && oldJson["eventTriggerID"] === elementToTrigger) {
-                let currentTargetElementMD5 = calcMD5(xml.serializeToString(document.getElementById(oldJson["id"])));
-                if(currentTargetElementMD5 === oldJson["oldMd5"]) { // Current page state is the same as it was when
-                                                                    // change was stored
-                    elementFound = true;
-                    let eventToTrigger = oldJson["eventType"];
-                    let elementToTrigger = document.getElementById(oldJson["eventTriggerID"]);
+            if(oldJson["name"] === elementToWatch) {
+                let targetElement = document.getElementById(oldJson["id"]);
+                let eventToTrigger = oldJson["eventType"];
+                let elementToTrigger = document.getElementById(oldJson["eventTriggerID"]);
 
-                    let oldPrevMD5 = oldJson["oldMd5"];
-                    let newPrevMD5 = oldJson["newMd5"];
+                let oldPrevMd5 = oldJson["oldMd5"];
+                let newPrevMd5 = oldJson["newMd5"];
 
-                    setTimeout(function () {
-                        let oldCurrentMD5 = calcMD5(xml.serializeToString(document.getElementById(oldJson["id"])));
+                let oldCurrentMd5 = calcMD5(xml.serializeToString(targetElement));
+                if (oldPrevMd5 !== oldCurrentMd5) {
+                    console.log(targetElement.nodeName.toLowerCase() + " old md5 value is not the same");
+                } else {
+                    if (eventToTrigger === "change" && (elementToTrigger.getAttribute("type") === "radio"
+                        || elementToTrigger.getAttribute("type") === "checkbox")) {
+                        // If it is a radiobutton or a checkbox then explicitly change the "checked" attribute to true then
+                        // trigger the event
+                        $("#" + oldJson["eventTriggerID"]).attr("checked", true);
+                    }
 
-                        // Handle Case for Triggering Radio Button Change
-                        if(eventToTrigger === "change" && (elementToTrigger.getAttribute("type") === "radio"
-                            || elementToTrigger.getAttribute("type") === "checkbox")) {
-                            $("#" + oldJson["eventTriggerID"]).attr("checked", true);
-                        }
+                    $(elementToTrigger).trigger(eventToTrigger);
+                    let newCurrentMd5 = calcMD5(xml.serializeToString(targetElement));
 
-                        $(elementToTrigger).trigger(eventToTrigger); // Change triggered
-                        let newCurrentMD5 = calcMD5(xml.serializeToString(document.getElementById(oldJson["id"])));
-
-                        // if(eventToTrigger === "change" && elementToTrigger.getAttribute("type") === "radio") {
-                        //     $("#" + oldJson["eventTriggerID"]).attr("checked", false);
-                        // }
-
-                        if (oldPrevMD5 !== oldCurrentMD5)
-                            console.log("MD5 before change is not the same - " + oldPrevMD5 + " -> " + oldCurrentMD5);
-                        else console.log("MD5 before change is the same - " + oldCurrentMD5);
-
-                        if (newPrevMD5 !== newCurrentMD5)
-                            console.log("MD5 after change is not the same - " + newPrevMD5 + " -> " + newCurrentMD5);
-                        else console.log("MD5 after change is the same - " + newCurrentMD5);
-                    }, 0);
+                    if (newPrevMd5 !== newCurrentMd5)
+                        console.log("Md5 of target element after event trigger has changed - " + newPrevMd5 + " " + newCurrentMd5);
+                    else
+                        console.log("Md5 of target element after event trigger is the same");
                 }
             }
-        }
-
-        if(!elementFound) {
-            alert("Target element not found on the page");
-
         }
     };
     reader.readAsText(file);
@@ -406,7 +391,7 @@ $("button").on("click", function() {
             dumpChangesToDisk(modifiedElements);
             domTreeInitial = currentDOM;
         }
-    }, 2000);
+    }, 1000);
 });
 
 $("input").on("change", function() {
