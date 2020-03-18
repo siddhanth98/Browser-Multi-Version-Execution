@@ -192,9 +192,10 @@ var index = 1;
 var nodes = [];
 var eventHandlers = {};
 
-$("body").append("<button id = 'triggerButton'> Trigger </button>");
+// $("body").append("<button id = 'triggerButton'> Trigger </button>");
 $("body").append("<input type = \"file\" id = \"file-input\">");
 assignID(document.querySelector("html"));
+// storeEvents(document.querySelector("html"));
 
 setTimeout(function() {
     createTree(document.querySelector("html"));
@@ -202,15 +203,27 @@ setTimeout(function() {
 
 function assignID(element) {
     if(element.children.length === 0 && (element.getAttribute("id") === null ||
-        element.getAttribute("id").length === 0))
+        element.getAttribute("id").length === 0)) {
         element.setAttribute("id", index++);
-
+    }
     else {
         if(element.getAttribute("id") === null || element.getAttribute("id").length === 0)
             element.setAttribute("id", index++);
 
         for(let i = 0 ; i < element.children.length; i++)
             assignID(element.children[i]);
+    }
+}
+
+/* Create a tree resembling the DOM Tree, calculate and store the md5 of each dom node in the tree to detect changes later */
+function createTree(element) {
+    if(element.children.length === 0)
+        new Node(element);
+
+    else {
+        for (let i = 0; i < element.children.length; i++)
+            createTree(element.children[i]);
+        new Node(element);
     }
 }
 
@@ -438,17 +451,6 @@ function Node(element) {
 
 }
 
-/* Create a tree resembling the DOM Tree, calculate and store the md5 of each dom node in the tree to detect changes later */
-function createTree(element) {
-    if(element.children.length === 0)
-        new Node(element);
-
-    else {
-        for (let i = 0; i < element.children.length; i++)
-            createTree(element.children[i]);
-        new Node(element);
-    }
-}
 
 function dumpChangesInLocalStorage(modifiedElements) {
     for (let i = 0; i < modifiedElements.length; i++) {
@@ -510,41 +512,15 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
     }
 }
 
-function handleElement(element) {
-    $(element).on("click", function(event) {
-        let buttonClicked = $(this);
-        let originalEventHandler;
-
-        setTimeout(function() {
-            originalEventHandler = event.handleObj.handler; // Capture the original event handler and store
-            eventHandlers[buttonClicked.attr("id")] = originalEventHandler;
-
-            console.log(originalEventHandler);
-            let currentDOM = xml.serializeToString(document.querySelector("html"));
-
-            if(calcMD5(domTreeInitial) !== calcMD5(currentDOM)) {
-                // DOM Tree has changed, detect the element which has changed
-                let oldNodes = nodes; // Save old/previous DOM node details
-                nodes = [];
-                createTree(document.querySelector("html"));
-
-                detectDomChange(oldNodes, buttonClicked, "click");
-                dumpChangesToDisk(modifiedElements);
-                dumpChangesInLocalStorage(modifiedElements);
-                domTreeInitial = currentDOM;
-            }
-        }, 500);
-    });
-}
-
-function listenToAllElements(element) {
-    handleElement(element);
-
-    for(let i = 0; i < element.children().length; i++) {
-        let child = element.children()[i];
-        listenToAllElements(child);
+/*function storeEvents(element) {
+    if (element.children.length === 0 && Object.keys(getEventListeners(element)).length > 0)
+        eventHandlers[element.getAttribute("id")] = Object.keys(getEventListeners(element));
+    else {
+        for(let i = 0; i < element.children.length; i++)
+            storeEvents((element.children)[i])
     }
-}
+}*/
+
 
 document.querySelector("#file-input").addEventListener("change", function(e) {
     // Replays the events associated to a specific element in sequence
@@ -596,9 +572,13 @@ document.querySelector("#file-input").addEventListener("change", function(e) {
     reader.readAsText(file);
 });
 
-$("button").on("click", function(event) {
-    let buttonClicked = $(this);
+
+
+/*$("body").on("click", function(event) {
+    let buttonClicked = $(event.target);
     let originalEventHandler;
+
+    console.log(buttonClicked);
 
     setTimeout(function() {
         originalEventHandler = event.handleObj.handler; // Capture the original event handler and store
@@ -607,8 +587,11 @@ $("button").on("click", function(event) {
         console.log(originalEventHandler);
         let currentDOM = xml.serializeToString(document.querySelector("html"));
 
-        if(calcMD5(domTreeInitial) !== calcMD5(currentDOM)) {
-            // DOM Tree has changed, detect the element which has changed
+        let oldDomMD5 = calcMD5(domTreeInitial);
+        let currentDomMD5 = calcMD5(currentDOM);
+
+        if(oldDomMD5 !== currentDomMD5) {
+            // DOM Tree has changed, detect the element which has changed and store its details
             let oldNodes = nodes; // Save old/previous DOM node details
             nodes = [];
             createTree(document.querySelector("html"));
@@ -618,8 +601,80 @@ $("button").on("click", function(event) {
             dumpChangesInLocalStorage(modifiedElements);
             domTreeInitial = currentDOM;
         }
-    }, 500);
-});
+    }, 50);
+});*/
+
+function listenToEvents(element) {
+    if(element.children.length === 0) {
+        $(element).on("click", function (event) {
+            let buttonClicked = $(event.target);
+            let originalEventHandler;
+
+            console.log(buttonClicked);
+
+            setTimeout(function () {
+                originalEventHandler = event.handleObj.handler; // Capture the original event handler and store
+                eventHandlers[buttonClicked.attr("id")] = originalEventHandler;
+
+                console.log(originalEventHandler);
+                let currentDOM = xml.serializeToString(document.querySelector("html"));
+
+                let oldDomMD5 = calcMD5(domTreeInitial);
+                let currentDomMD5 = calcMD5(currentDOM);
+
+                if (oldDomMD5 !== currentDomMD5) {
+                    // DOM Tree has changed, detect the element which has changed and store its details
+                    let oldNodes = nodes; // Save old/previous DOM node details
+                    nodes = [];
+                    createTree(document.querySelector("html"));
+
+                    detectDomChange(oldNodes, buttonClicked, "click");
+                    dumpChangesToDisk(modifiedElements);
+                    dumpChangesInLocalStorage(modifiedElements);
+                    domTreeInitial = currentDOM;
+                }
+            }, 50);
+        });
+
+        $(element).on("change", function(event) {
+            let inputElement = $(this);
+            let originalEventHandler;
+            setTimeout(function () {
+                originalEventHandler = event.handleObj.handler;
+                console.log(originalEventHandler());
+                // Convert following lines into a function
+                let currentDOM = xml.serializeToString(document.querySelector("html"));
+
+                if (calcMD5(domTreeInitial) !== calcMD5(currentDOM)) {
+                    let oldNodes = nodes;
+                    nodes = [];
+
+                    // If input is a radio button then change "checked" to true, store change
+                    // to preserve md5 value of the body
+
+                    if (inputElement.attr("type") === "radio" || inputElement.attr("type") === "checkbox")
+                        inputElement.attr("checked", true);
+
+                    createTree(document.querySelector("html"));
+
+                    /*if(inputElement.attr("type") === "radio")
+                        inputElement.attr("checked", false);*/
+
+                    detectDomChange(oldNodes, inputElement, "change");
+                    dumpChangesToDisk(modifiedElements);
+                    domTreeInitial = currentDOM;
+                }
+            }, 1000);
+        });
+    }
+
+    else {
+        for(let i = 0; i < element.children.length; i++)
+            listenToEvents(element.children[i]);
+    }
+}
+
+listenToEvents(document.querySelector("body"));
 
 $("input").on("change", function(event) {
     let inputElement = $(this);
@@ -654,15 +709,13 @@ $("input").on("change", function(event) {
 
 /* ************************** For testing purposes only (hardcoded element id's for simple page) ************************** */
 $("#modifier-button-1").on("click", function() {
-    if(!slidUp) {
+    if (!slidUp) {
         /* Expected Change */
         // $("#divOriginal p").slideUp();
         $("#divOriginal p").text($("#divOriginal p").text().toString().toUpperCase());
         $(this).text("Slide Down");
         slidUp = true;
-    }
-
-    else {
+    } else {
         /* Expected Change */
         // $("#divOriginal p").slideDown();
         $("#divOriginal p").text($("#divOriginal p").text().toString().toLowerCase());
@@ -670,6 +723,7 @@ $("#modifier-button-1").on("click", function() {
         slidUp = false;
     }
 });
+
 
 $("#modifier-button-2").on("click", function() {
     $("#divOriginal p").css("color", "white");
