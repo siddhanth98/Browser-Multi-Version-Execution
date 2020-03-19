@@ -604,7 +604,7 @@ document.querySelector("#file-input").addEventListener("change", function(e) {
     }, 50);
 });*/
 
-function listenToEvents(element) {
+/*function listenToEvents(element) {
     if(element.children.length === 0) {
         $(element).on("click", function (event) {
             let buttonClicked = $(event.target);
@@ -657,8 +657,8 @@ function listenToEvents(element) {
 
                     createTree(document.querySelector("html"));
 
-                    /*if(inputElement.attr("type") === "radio")
-                        inputElement.attr("checked", false);*/
+                    /!*if(inputElement.attr("type") === "radio")
+                        inputElement.attr("checked", false);*!/
 
                     detectDomChange(oldNodes, inputElement, "change");
                     dumpChangesToDisk(modifiedElements);
@@ -674,9 +674,90 @@ function listenToEvents(element) {
     }
 }
 
-listenToEvents(document.querySelector("body"));
+listenToEvents(document.querySelector("body"));*/
 
-$("input").on("change", function(event) {
+function placeHandler(element, event) {
+    $(element).on(event, function(e) {
+        let triggerElement = $(element);
+        let originalEventHandler;
+
+        setTimeout(function () {
+            originalEventHandler = e.handleObj.handler; // Capture the original event handler and store
+            eventHandlers[triggerElement.attr("id")] = originalEventHandler;
+
+            let currentDOM = xml.serializeToString(document.querySelector("html"));
+
+            let oldDomMD5 = calcMD5(domTreeInitial);
+            let currentDomMD5 = calcMD5(currentDOM);
+
+            if (oldDomMD5 !== currentDomMD5) {
+
+                // DOM Tree has changed, detect the element which has changed and store its details
+
+                let oldNodes = nodes; // Save old/previous DOM node details
+                nodes = [];
+                createTree(document.querySelector("html"));
+
+                // For input text boxes/areas, store values to be reinserted in the text boxes/areas
+                detectDomChange(oldNodes, triggerElement, event);
+                dumpChangesToDisk(modifiedElements);
+                dumpChangesInLocalStorage(modifiedElements);
+                domTreeInitial = currentDOM;
+            }
+        }, 50);
+    });
+}
+
+
+
+/************************************** Get Jquery Event Handlers ***************************************************/
+function getEvents(element) {
+    if(element.children.length === 0) {
+        let events = [];
+        $.each($._data(element, "events"), function(i, event) {
+            events.push(event);
+        });
+        if(events.length > 0) {
+            events.forEach(event => {
+                placeHandler(element, event[0]["type"]);
+            });
+        }
+    }
+    else {
+        for (let i = 0; i < element.children.length; i++)
+            getEvents(element.children[i]);
+    }
+}
+
+$(function getEventsWrapper() {
+    let bodyElement = document.querySelector("body");
+    getEvents(bodyElement);
+});
+
+/***************************************************************** ***************************************************/
+
+
+
+
+/********************************************** Get default javascript event handlers ********************************/
+HTMLButtonElement.prototype.realAddEventListener = HTMLButtonElement.prototype.addEventListener;
+HTMLButtonElement.prototype.addEventListener = function(event, handler, c) {
+    this.realAddEventListener(event, handler);
+    if (!handler.toString().includes("void"))
+        placeHandler(this, event);
+};
+
+HTMLInputElement.prototype.realAddEventListener = HTMLInputElement.prototype.addEventListener;
+HTMLInputElement.prototype.addEventListener = function(event, handler) {
+    this.realAddEventListener(event, handler);
+    if (!handler.toString().includes("void"))
+        placeHandler(this, event);
+};
+
+/************************************************************ ********************************************************/
+
+
+/*$("input").on("change", function(event) {
     let inputElement = $(this);
     let originalEventHandler;
     setTimeout(function() {
@@ -697,18 +778,18 @@ $("input").on("change", function(event) {
 
             createTree(document.querySelector("html"));
 
-            /*if(inputElement.attr("type") === "radio")
-                inputElement.attr("checked", false);*/
+            /!*if(inputElement.attr("type") === "radio")
+                inputElement.attr("checked", false);*!/
 
             detectDomChange(oldNodes, inputElement, "change");
             dumpChangesToDisk(modifiedElements);
             domTreeInitial = currentDOM;
         }
     }, 1000);
-});
+});*/
 
 /* ************************** For testing purposes only (hardcoded element id's for simple page) ************************** */
-$("#modifier-button-1").on("click", function() {
+document.querySelector("#modifier-button-1").addEventListener("click", function() {
     if (!slidUp) {
         /* Expected Change */
         // $("#divOriginal p").slideUp();
@@ -724,13 +805,16 @@ $("#modifier-button-1").on("click", function() {
     }
 });
 
+document.querySelector("#modifier-button-1").addEventListener("click", function() {
+    console.log("2nd handler");
+});
 
 $("#modifier-button-2").on("click", function() {
     $("#divOriginal p").css("color", "white");
     $("#divOriginal p").css("backgroundColor", "blue");
 });
 
-$("#input-1").on("change", function() {
+document.querySelector("#input-1").addEventListener("change", function() {
     $("#divOriginal p").css("display", "none");
 });
 
