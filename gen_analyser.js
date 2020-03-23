@@ -183,6 +183,7 @@
     }
 });
 
+
 var slidUp = false;
 var xml = new XMLSerializer();
 var domTreeInitial = xml.serializeToString(document.querySelector("html")); // using just "document" gives
@@ -213,6 +214,22 @@ function assignID(element) {
         for(let i = 0 ; i < element.children.length; i++)
             assignID(element.children[i]);
     }
+}
+
+function Node(element) {
+    this.name = element.nodeName.toLowerCase();
+    this.classList = element.classList;
+
+    // Set an id for the element and store it for uniquely getting the md5 value later
+    /*if(element.id === undefined || element.id.length === 0)
+        element.setAttribute("id", (index++));*/
+    this.id = element.id;
+    this.children = element.children;
+    if(element.nodeName.toLowerCase() === "input" || element.nodeName.toLowerCase() === "textarea")
+        this.value = element.value;
+    this.md5 = calcMD5(xml.serializeToString(element));
+    nodes.push(this);
+
 }
 
 /* Create a tree resembling the DOM Tree, calculate and store the md5 of each dom node in the tree to detect changes later */
@@ -435,23 +452,6 @@ function CreateObject(nodeName, cls, id, eventType, eventTriggerID, oldMd5Val, n
     this.newMd5 = newMd5Val;
 }
 
-function Node(element) {
-    this.name = element.nodeName.toLowerCase();
-    this.classList = element.classList;
-
-    // Set an id for the element and store it for uniquely getting the md5 value later
-    /*if(element.id === undefined || element.id.length === 0)
-        element.setAttribute("id", (index++));*/
-    this.id = element.id;
-    this.children = element.children;
-    if(element.nodeName.toLowerCase() === "input" || element.nodeName.toLowerCase() === "textarea")
-        this.value = element.value;
-    this.md5 = calcMD5(xml.serializeToString(element));
-    nodes.push(this);
-
-}
-
-
 function dumpChangesInLocalStorage(modifiedElements) {
     for (let i = 0; i < modifiedElements.length; i++) {
         localStorage.setItem(modifiedElements[i].name, JSON.stringify(modifiedElements[i]));
@@ -511,16 +511,6 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
         found = false;
     }
 }
-
-/*function storeEvents(element) {
-    if (element.children.length === 0 && Object.keys(getEventListeners(element)).length > 0)
-        eventHandlers[element.getAttribute("id")] = Object.keys(getEventListeners(element));
-    else {
-        for(let i = 0; i < element.children.length; i++)
-            storeEvents((element.children)[i])
-    }
-}*/
-
 
 document.querySelector("#file-input").addEventListener("change", function(e) {
     // Replays the events associated to a specific element in sequence
