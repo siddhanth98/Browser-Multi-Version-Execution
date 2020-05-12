@@ -1,3 +1,4 @@
+
 (function (global, factory) {
     if (typeof define === "function" && define.amd) {
         define([], factory);
@@ -192,11 +193,21 @@ var modifiedElements = [];
 var index = 1;
 var nodes = [];
 var eventHandlers = {};
+var socket;
 
-// $("body").append("<button id = 'triggerButton'> Trigger </button>");
+$("body").append("<button id = 'triggerButton'> Trigger </button>");
 $("body").append("<input type = \"file\" id = \"file-input\">");
 assignID(document.querySelector("html"));
 // storeEvents(document.querySelector("html"));
+
+window.onload = function() {
+    socket = io("http://localhost:3000/");
+    socket.emit('helloFromDom1', 'dom1');
+    console.log('Sent hello message to server socket');
+    socket.on('helloFromDom1', function(msg){
+        console.log(msg);
+    });
+}
 
 setTimeout(function() {
     createTree(document.querySelector("html"));
@@ -225,11 +236,9 @@ function Node(element) {
         element.setAttribute("id", (index++));*/
     this.id = element.id;
     this.children = element.children;
-    if(element.nodeName.toLowerCase() === "input" || element.nodeName.toLowerCase() === "textarea")
-        this.value = element.value;
+    this.value = element.value;
     this.md5 = calcMD5(xml.serializeToString(element));
     nodes.push(this);
-
 }
 
 /* Create a tree resembling the DOM Tree, calculate and store the md5 of each dom node in the tree to detect changes later */
@@ -243,6 +252,11 @@ function createTree(element) {
         new Node(element);
     }
 }
+
+let divs = document.getElementsByTagName("div");
+
+for (let i = 0; i < divs.length; i++)
+    placeHandler(divs[i], "click");
 
 function calcMD5(string) {
     function rotateLeft(lValue, iShiftBits) {
@@ -452,29 +466,72 @@ function CreateObject(nodeName, cls, id, eventType, eventTriggerID, oldMd5Val, n
     this.newMd5 = newMd5Val;
 }
 
-function dumpChangesInLocalStorage(modifiedElements) {
-    for (let i = 0; i < modifiedElements.length; i++) {
-        localStorage.setItem(modifiedElements[i].name, JSON.stringify(modifiedElements[i]));
-    }
-}
 
 function dumpChangesToDisk(modifiedElements) {
+
     let jsonString = "";
     let elementIndex = 0;
     let indexedModifiedElements = {};
 
-    for(let i = 0; i < modifiedElements.length; i++)
+    for (let i = 0; i < modifiedElements.length; i++) {
         indexedModifiedElements[elementIndex++] = modifiedElements[i];
+    }
 
     jsonString = JSON.stringify(indexedModifiedElements);
+    // console.log(jsonString);
 
-    var blob = new Blob([jsonString], {type:"text/plain; charset=utf-8"});
-    saveAs(blob, "changes.txt");
+    // let storeChanges = prompt("Store this change?");
+
+    /*fetch("http://localhost:3000/getDomChanges", {
+        method: "POST",
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({input: jsonString})
+    })
+        .then((res) => {
+            console.log("Sent the changes");
+            return res.text();
+        })
+        .then((res) => {
+            console.log(res);
+        })
+        .catch((err) => {
+            console.error(err);
+        });*/
+
+    // Send json to socket endpoint
+    socket.emit('DomChange', jsonString);
+
+    /*fetch("http://localhost:3000/", {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+            "Accept": "application/json, text/plain, *!/!*",
+            "Content-Type": "application/json, text/plain",
+            "Access-Control-Allow-Origin": "*"
+        },
+        body: jsonString
+    })
+        .then((response) => {
+            console.log(response.text());
+            return response.text();
+        })
+        .then((response) => {
+            console.log(response);
+        })
+    .catch((err) => {
+        console.error(err);
+    });*/
+
+    /*var blob = new Blob([jsonString], {type: "text/plain; charset=utf-8"});
+    saveAs(blob, "changes.txt");*/
 }
 
 function detectDomChange(oldNodes, eventTrigger, eventType) {
     let modifiedElement;
     let found = false;
+
     for(let i = 0; i < nodes.length; i++) {
         for(let j = 0; j < oldNodes.length; j++) {
 
@@ -482,6 +539,7 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
                 found = true; // Found the modified node/element
 
                 if(eventType === "click") {
+
                     modifiedElement = new CreateObject(oldNodes[j].name, oldNodes[j].classList, oldNodes[j].id,
                         eventType, eventTrigger.attr("id"), oldNodes[j].md5, nodes[i].md5);
                     modifiedElements.push(modifiedElement);
@@ -490,8 +548,13 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
                 else if(eventType === "change") {
                     modifiedElement = new CreateObject(oldNodes[j].name, oldNodes[j].classList, oldNodes[j].id,
                         eventType, eventTrigger.attr("id"), oldNodes[j].md5, nodes[i].md5);
-                    modifiedElement["oldVal"] = oldNodes[j].value;
-                    modifiedElement["newVal"] = nodes[i].value;
+
+                    if(eventTrigger.attr("type") === "text") {
+                        if(eventHandlers[eventTrigger.attr("id")] !== undefined)
+                            modifiedElement["handler"] = JSON.stringify((eventHandlers[eventTrigger.attr("id")]).toString());
+                        modifiedElement["value"] = eventTrigger.val();
+                    }
+
                     modifiedElements.push(modifiedElement);
                 }
 
@@ -511,6 +574,82 @@ function detectDomChange(oldNodes, eventTrigger, eventType) {
         found = false;
     }
 }
+
+$("#triggerButton").on("click", function() {
+    fetch("http://localhost:3000/sendDomChanges")
+        .then((res) => res.json())
+        .then((res) => {
+            if (Object.keys(res).length > 0)
+                reTriggerChanges(res);
+        })
+});
+
+function reTriggerChanges(changes) {
+    let indexedModifiedElements = changes;
+    let keys = Object.keys(indexedModifiedElements);
+    let elementToWatch = prompt("Which element to watch?");
+
+    for (let i = 0; i < keys.length; i++) {
+        let oldJson = indexedModifiedElements[keys[i]];
+
+        if(oldJson["name"] === elementToWatch) {
+            let targetElement = document.getElementById(oldJson["id"]);
+            let eventToTrigger = oldJson["eventType"];
+            let elementToTrigger = document.getElementById(oldJson["eventTriggerID"]);
+
+            let oldPrevMd5 = oldJson["oldMd5"];
+            let newPrevMd5 = oldJson["newMd5"];
+
+            // let oldCurrentMd5 = calcMD5(xml.serializeToString(targetElement)); calcMD5() is not there in this file
+            if (/*oldPrevMd5 !== oldCurrentMd5*/false) {
+                console.log(targetElement.nodeName.toLowerCase() + " old md5 value is not the same");
+            } else {
+                if (eventToTrigger === "change" && (elementToTrigger.getAttribute("type") === "radio"
+                    || elementToTrigger.getAttribute("type") === "checkbox")) {
+                    // If it is a radiobutton or a checkbox then explicitly change the "checked" attribute to true then
+                    // trigger the event
+                    $("#" + oldJson["eventTriggerID"]).attr("checked", true);
+                }
+
+                else if(elementToTrigger.getAttribute("type") === "text") {
+                    elementToTrigger.value = oldJson["value"];
+                    if(oldJson["handler"] !== undefined)
+                        eval("(" + JSON.parse(oldJson["handler"]) + ")()");
+                }
+
+                $(elementToTrigger).trigger(eventToTrigger);
+                // let newCurrentMd5 = calcMD5(xml.serializeToString(targetElement));
+
+                /*if (newPrevMd5 !== newCurrentMd5)
+                    console.log("Md5 of target element after event trigger has changed - " + newPrevMd5 + " " + newCurrentMd5);
+                else
+                    console.log("Md5 of target element after event trigger is the same");*/
+            }
+        }
+    }
+}
+
+$("input").on("change", function() {
+    if($(this).attr("type") === "text") {
+        let value = this.value;
+        let md5Val = calcMD5(xml.serializeToString(this));
+        let modifiedElement = new CreateObject("input", this.classList, $(this).attr("id"),
+            "change", $(this).attr("id"), md5Val, md5Val);
+        modifiedElement["value"] = value;
+        modifiedElement["handler"] = eventHandlers[$(this).attr("id")];
+        modifiedElements.push(modifiedElement);
+    }
+
+    else {
+        let md5Val = calcMD5(xml.serializeToString(this));
+        let modifiedElement = new CreateObject("input", this.classList, $(this).attr("id"),
+            "change", $(this).attr("id"), md5Val, md5Val);
+        modifiedElement["handler"] = eventHandlers[$(this).attr("id")];
+        modifiedElements.push(modifiedElement);
+    }
+    dumpChangesToDisk(modifiedElements);
+});
+
 
 document.querySelector("#file-input").addEventListener("change", function(e) {
     // Replays the events associated to a specific element in sequence
@@ -548,6 +687,12 @@ document.querySelector("#file-input").addEventListener("change", function(e) {
                         $("#" + oldJson["eventTriggerID"]).attr("checked", true);
                     }
 
+                    else if(elementToTrigger.getAttribute("type") === "text") {
+                         elementToTrigger.value = oldJson["value"];
+                         if(oldJson["handler"] !== undefined)
+                            eval("(" + JSON.parse(oldJson["handler"]) + ")()");
+                    }
+
                     $(elementToTrigger).trigger(eventToTrigger);
                     let newCurrentMd5 = calcMD5(xml.serializeToString(targetElement));
 
@@ -562,124 +707,19 @@ document.querySelector("#file-input").addEventListener("change", function(e) {
     reader.readAsText(file);
 });
 
-
-
-/*$("body").on("click", function(event) {
-    let buttonClicked = $(event.target);
-    let originalEventHandler;
-
-    console.log(buttonClicked);
-
-    setTimeout(function() {
-        originalEventHandler = event.handleObj.handler; // Capture the original event handler and store
-        eventHandlers[buttonClicked.attr("id")] = originalEventHandler;
-
-        console.log(originalEventHandler);
-        let currentDOM = xml.serializeToString(document.querySelector("html"));
-
-        let oldDomMD5 = calcMD5(domTreeInitial);
-        let currentDomMD5 = calcMD5(currentDOM);
-
-        if(oldDomMD5 !== currentDomMD5) {
-            // DOM Tree has changed, detect the element which has changed and store its details
-            let oldNodes = nodes; // Save old/previous DOM node details
-            nodes = [];
-            createTree(document.querySelector("html"));
-
-            detectDomChange(oldNodes, buttonClicked, "click");
-            dumpChangesToDisk(modifiedElements);
-            dumpChangesInLocalStorage(modifiedElements);
-            domTreeInitial = currentDOM;
-        }
-    }, 50);
-});*/
-
-/*function listenToEvents(element) {
-    if(element.children.length === 0) {
-        $(element).on("click", function (event) {
-            let buttonClicked = $(event.target);
-            let originalEventHandler;
-
-            console.log(buttonClicked);
-
-            setTimeout(function () {
-                originalEventHandler = event.handleObj.handler; // Capture the original event handler and store
-                eventHandlers[buttonClicked.attr("id")] = originalEventHandler;
-
-                console.log(originalEventHandler);
-                let currentDOM = xml.serializeToString(document.querySelector("html"));
-
-                let oldDomMD5 = calcMD5(domTreeInitial);
-                let currentDomMD5 = calcMD5(currentDOM);
-
-                if (oldDomMD5 !== currentDomMD5) {
-                    // DOM Tree has changed, detect the element which has changed and store its details
-                    let oldNodes = nodes; // Save old/previous DOM node details
-                    nodes = [];
-                    createTree(document.querySelector("html"));
-
-                    detectDomChange(oldNodes, buttonClicked, "click");
-                    dumpChangesToDisk(modifiedElements);
-                    dumpChangesInLocalStorage(modifiedElements);
-                    domTreeInitial = currentDOM;
-                }
-            }, 50);
-        });
-
-        $(element).on("change", function(event) {
-            let inputElement = $(this);
-            let originalEventHandler;
-            setTimeout(function () {
-                originalEventHandler = event.handleObj.handler;
-                console.log(originalEventHandler());
-                // Convert following lines into a function
-                let currentDOM = xml.serializeToString(document.querySelector("html"));
-
-                if (calcMD5(domTreeInitial) !== calcMD5(currentDOM)) {
-                    let oldNodes = nodes;
-                    nodes = [];
-
-                    // If input is a radio button then change "checked" to true, store change
-                    // to preserve md5 value of the body
-
-                    if (inputElement.attr("type") === "radio" || inputElement.attr("type") === "checkbox")
-                        inputElement.attr("checked", true);
-
-                    createTree(document.querySelector("html"));
-
-                    /!*if(inputElement.attr("type") === "radio")
-                        inputElement.attr("checked", false);*!/
-
-                    detectDomChange(oldNodes, inputElement, "change");
-                    dumpChangesToDisk(modifiedElements);
-                    domTreeInitial = currentDOM;
-                }
-            }, 1000);
-        });
-    }
-
-    else {
-        for(let i = 0; i < element.children.length; i++)
-            listenToEvents(element.children[i]);
-    }
-}
-
-listenToEvents(document.querySelector("body"));*/
-
 function placeHandler(element, event) {
-    $(element).on(event, function(e) {
+
+    $(element).on(event, function (e) {
         let triggerElement = $(element);
         let originalEventHandler;
 
         setTimeout(function () {
             originalEventHandler = e.handleObj.handler; // Capture the original event handler and store
-            eventHandlers[triggerElement.attr("id")] = originalEventHandler;
 
             let currentDOM = xml.serializeToString(document.querySelector("html"));
 
             let oldDomMD5 = calcMD5(domTreeInitial);
             let currentDomMD5 = calcMD5(currentDOM);
-
             if (oldDomMD5 !== currentDomMD5) {
 
                 // DOM Tree has changed, detect the element which has changed and store its details
@@ -688,16 +728,14 @@ function placeHandler(element, event) {
                 nodes = [];
                 createTree(document.querySelector("html"));
 
-                // For input text boxes/areas, store values to be reinserted in the text boxes/areas
+                // For input text boxes/areas, store values to be reinserted in the text boxes/areasetc
                 detectDomChange(oldNodes, triggerElement, event);
                 dumpChangesToDisk(modifiedElements);
-                dumpChangesInLocalStorage(modifiedElements);
                 domTreeInitial = currentDOM;
             }
-        }, 50);
+        }, 0);
     });
 }
-
 
 
 /************************************** Get Jquery Event Handlers ***************************************************/
@@ -707,6 +745,7 @@ function getEvents(element) {
         $.each($._data(element, "events"), function(i, event) {
             events.push(event);
         });
+
         if(events.length > 0) {
             events.forEach(event => {
                 placeHandler(element, event[0]["type"]);
@@ -731,52 +770,35 @@ $(function getEventsWrapper() {
 
 /********************************************** Get default javascript event handlers ********************************/
 HTMLButtonElement.prototype.realAddEventListener = HTMLButtonElement.prototype.addEventListener;
-HTMLButtonElement.prototype.addEventListener = function(event, handler, c) {
+HTMLButtonElement.prototype.addEventListener = function(event, handler) {
     this.realAddEventListener(event, handler);
-    if (!handler.toString().includes("void"))
+    if (!handler.toString().includes("void")) {
+        eventHandlers[this.getAttribute("id")] = handler;
         placeHandler(this, event);
+    }
 };
 
 HTMLInputElement.prototype.realAddEventListener = HTMLInputElement.prototype.addEventListener;
 HTMLInputElement.prototype.addEventListener = function(event, handler) {
     this.realAddEventListener(event, handler);
-    if (!handler.toString().includes("void"))
+    if (!handler.toString().includes("void")) {
+        eventHandlers[this.getAttribute("id")] = handler;
         placeHandler(this, event);
+    }
 };
 
+HTMLDocument.prototype.realAddEventListener = HTMLDocument.prototype.addEventListener;
+HTMLDocument.prototype.addEventListener = function(event, handler) {
+    this.realAddEventListener(event, handler);
+    if (!handler.toString().includes("void")) {
+        eventHandlers[this.getAttribute("id")] = handler;
+        placeHandler(this, event);
+    }
+};
 /************************************************************ ********************************************************/
 
 
-/*$("input").on("change", function(event) {
-    let inputElement = $(this);
-    let originalEventHandler;
-    setTimeout(function() {
-        originalEventHandler = event.handleObj.handler;
-        console.log(originalEventHandler());
-        // Convert following lines into a function
-        let currentDOM = xml.serializeToString(document.querySelector("html"));
 
-        if(calcMD5(domTreeInitial) !== calcMD5(currentDOM)) {
-            let oldNodes = nodes;
-            nodes = [];
-
-            // If input is a radio button then change "checked" to true, store change
-            // to preserve md5 value of the body
-
-            if(inputElement.attr("type") === "radio" || inputElement.attr("type") === "checkbox")
-                inputElement.attr("checked", true);
-
-            createTree(document.querySelector("html"));
-
-            /!*if(inputElement.attr("type") === "radio")
-                inputElement.attr("checked", false);*!/
-
-            detectDomChange(oldNodes, inputElement, "change");
-            dumpChangesToDisk(modifiedElements);
-            domTreeInitial = currentDOM;
-        }
-    }, 1000);
-});*/
 
 /* ************************** For testing purposes only (hardcoded element id's for simple page) ************************** */
 document.querySelector("#modifier-button-1").addEventListener("click", function() {
@@ -804,9 +826,9 @@ $("#modifier-button-2").on("click", function() {
     $("#divOriginal p").css("backgroundColor", "blue");
 });
 
-document.querySelector("#input-1").addEventListener("change", function() {
+/*document.querySelector("#input-1").addEventListener("change", function() {
     $("#divOriginal p").css("display", "none");
-});
+});*/
 
 $("input[type = 'radio']").on("change", function() {
     let radioVal = $("input[type = 'radio']:checked").val();

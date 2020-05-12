@@ -1,0 +1,16 @@
+{
+  "name": "dom-web-page-2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "domPage2.js",
+  "dependencies": {
+    "socket.io": "^2.3.0",
+    "socket.io-client": "^2.3.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
